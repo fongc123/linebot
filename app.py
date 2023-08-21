@@ -1,14 +1,10 @@
 from flask import Flask, request, abort
 
-from linebot import (
-    WebhookParser
+from linebot.v3 import (
+    WebhookHandler
 )
 from linebot.v3.exceptions import (
     InvalidSignatureError
-)
-from linebot.v3.webhooks import (
-    MessageEvent,
-    TextMessageContent,
 )
 from linebot.v3.messaging import (
     Configuration,
@@ -16,6 +12,10 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage
+)
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent
 )
 
 from argparse import ArgumentParser
@@ -25,45 +25,46 @@ CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
-parser = WebhookParser(CHANNEL_SECRET)
+configuration = Configuration(access_token='YOUR_CHANNEL_ACCESS_TOKEN')
+handler = WebhookHandler('YOUR_CHANNEL_SECRET')
+
 
 @app.route("/callback", methods=['POST'])
 def callback():
+    # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']
 
     # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
 
-    # parse webhook body
+    # handle webhook body
     try:
-        events = parser.parse(body, signature)
+        handler.handle(body, signature)
     except InvalidSignatureError:
+        app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
-    # if event is MessageEvent and message is TextMessage, then echo text
-    for event in events:
-        if not isinstance(event, MessageEvent):
-            continue
-        if not isinstance(event.message, TextMessageContent):
-            continue
-        with ApiClient(configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            line_bot_api.reply_message_with_http_info(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=event.message.text)]
-                )
-            )
-
     return 'OK'
+
+
+@handler.add(MessageEvent, message=TextMessageContent)
+def handle_message(event):
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message_with_http_info(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=event.message.text)]
+            )
+        )
 
 if __name__ == "__main__":
     parser = ArgumentParser(
         usage="Usage: python " + __file__ + " [--port <port>] [--help]"
     )
-    parser.add_argument("--host", default="localhost", help="host")
+    parser.add_argument("--host", default="0.0.0.0", help="host")
     parser.add_argument("--port", type=int, default=5000, help="port")
     args = parser.parse_args()
+    
     app.run(debug=True, host=args.host, port=args.port)
