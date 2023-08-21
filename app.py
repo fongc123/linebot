@@ -63,6 +63,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(
         usage="Usage: python " + __file__ + " [--port <port>] [--help]"
     )
-    parser.add_argument("-p", "--port", type=int, default=5000, help="port")
+    parser.add_argument("--host", default="localhost", help="host")
+    parser.add_argument("--port", type=int, default=5000, help="port")
     args = parser.parse_args()
-    app.run()
+    app.run(debug=True, host=args.host, port=args.port)
