@@ -18,6 +18,8 @@ from linebot.v3.messaging import (
     TextMessage
 )
 
+from argparse import ArgumentParser
+
 CHANNEL_ACCESS_TOKEN = "QQiVYpwcXYAhYrQ0mCDNU8y+iv18MS7PDHoYs4WexlDQ4ZUFtiop0BTVqiWpL+bun9fJfOMgGfdxbeS3oaPzRa7j+zmb6kNcrSBFLkentJ4QPdBjv96OgOPoSUxvRWnetva7nOHqFsRk9am/s2k0kwdB04t89/1O/w1cDnyilFU="
 CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
 
@@ -57,5 +59,10 @@ def callback():
 
     return 'OK'
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
+    parser = ArgumentParser(
+        usage="Usage: python " + __file__ + " [--port <port>] [--help]"
+    )
+    parser.add_argument("-p", "--port", type=int, default=5000, help="port")
+    args = parser.parse_args()
     app.run()
