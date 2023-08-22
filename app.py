@@ -93,7 +93,7 @@ def send_message():
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
-                    to=body["user_id"],
+                    to=body["userId"],
                     messages=[TextMessage(text=body["message"])]
                 )
 
@@ -116,7 +116,7 @@ def send_image():
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
-                    to=body["user_id"],
+                    to=body["userId"],
                     messages=[ImageMessage(content=body["image"])]
                 )
 
