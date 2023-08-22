@@ -110,14 +110,16 @@ def send_image():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization"}), 401
     
+    image = request.files["image"]
     body = request.get_json()
+    print("yo")
     try:
         if "userId" in body.keys() and "image" in body.keys():
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
-                    messages=[ImageMessage(content=body["image"])]
+                    messages=[ImageMessage(originalContentUrl=image, previewImageUrl=image)]
                 )
 
                 line_bot_api.push_message(push_message_request)
