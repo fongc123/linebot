@@ -1,69 +1,78 @@
-import os
 from flask import Flask, request, abort
+import json
+from argparse import ArgumentParser
+import os
 
-from linebot import (
-    LineBotApi, WebhookHandler
+from linebot.v3 import (
+    WebhookHandler
 )
-from linebot.exceptions import (
+
+from linebot.v3.exceptions import (
     InvalidSignatureError
 )
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
+
+from linebot.v3.messaging import (
+    Configuration,
+    ApiClient,
+    MessagingApi,
+    ReplyMessageRequest,
+    TextMessage,
 )
 
-from argparse import ArgumentParser
-
-app = Flask(__name__)
+from linebot.v3.webhooks import (
+    MessageEvent,
+    TextMessageContent
+)
 
 CHANNEL_ACCESS_TOKEN = "QQiVYpwcXYAhYrQ0mCDNU8y+iv18MS7PDHoYs4WexlDQ4ZUFtiop0BTVqiWpL+bun9fJfOMgGfdxbeS3oaPzRa7j+zmb6kNcrSBFLkentJ4QPdBjv96OgOPoSUxvRWnetva7nOHqFsRk9am/s2k0kwdB04t89/1O/w1cDnyilFU="
 CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
 
-line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+app = Flask(__name__)
+
+configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-@app.route("/", methods=['POST'])
-def test():
-    # print the POST request and return 200 status code 
-    print(request.get_json())
-    return 'OK', 200
+def save_json(data, filename='data.json'):
+    with open(filename,'w') as f:
+        json.dump(data, f, indent=4)
 
 @app.route("/callback", methods=['POST'])
 def callback():
-    print("yo1")
-    # Get X-Line-Signature header value
+    # get X-Line-Signature header value
     signature = request.headers['X-Line-Signature']
 
-    # Get request body as text
+    # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
+    for event in body['events']:
+        save_json(event, event['type'] + '.json')
 
-    # Handle webhook body
+    # handle webhook body
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
+        app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
-    return 'OK'
+    return 200
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    print("yo2")
-    """ Here's all the messages will be handled and processed by the program """
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=event.message.text))
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message_with_http_info(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=event.message.text)]
+            )
+        )
 
 if __name__ == "__main__":
-    print("yo3")
     parser = ArgumentParser(
-        usage="Usage: python " + __file__ + " [--port <port>] [--help]"
+        usage="Usage: python " + __file__ + " [--host <host>] [--help]"
     )
     parser.add_argument("--host", default="0.0.0.0", help="host")
-    parser.add_argument("--port", type=int, default=5000, help="port")
-    args = parser.parse_args()
+    opts = parser.parse_args()
+    port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
 
-    # deploy to Heroku port
-    port = int(os.environ.get('PORT', 8000))
-    
-    print("yo4")
-    app.run(debug=True, host=args.host, port=port)
+    app.run(debug=True, host=opts.host, port=port)
