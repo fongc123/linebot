@@ -21,6 +21,12 @@ CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
+@app.route("/", methods=['POST'])
+def test():
+    # print the POST request and return 200 status code 
+    print(request.get_json())
+    return 'OK', 200
+
 @app.route("/callback", methods=['POST'])
 def callback():
     print("yo1")
