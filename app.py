@@ -51,7 +51,7 @@ def callback():
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
-    return 200
+    return (json.dumps({"status" : "OK"}), 200)
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
