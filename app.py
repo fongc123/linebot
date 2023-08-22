@@ -105,27 +105,6 @@ def send_message():
 
     return json.dumps({"status" : "OK"}), 200
 
-@app.route("/admin/send/image", methods=['POST'])
-def send_image():
-    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
-        return json.dumps({"status" : "Incorrect authorization"}), 401
-    
-    body = request.get_json()
-    try:
-        if "userId" in body.keys() and "image" in body.keys():
-            with ApiClient(configuration) as api_client:
-                line_bot_api = MessagingApi(api_client)
-                push_message_request = PushMessageRequest(
-                    to=body["userId"],
-                    messages=[ImageMessage(originalContentUrl="https://ibb.co/2MX87cH", previewImageUrl="https://ibb.co/2MX87cH")]
-                )
-
-                line_bot_api.push_message(push_message_request)
-        else:
-            raise Exception("Missing userId or image")
-    except Exception as e:
-        return json.dumps({"status" : str(e)}), 500
-
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     with ApiClient(configuration) as api_client:
