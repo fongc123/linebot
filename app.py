@@ -55,6 +55,9 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="host")
     parser.add_argument("--port", type=int, default=5000, help="port")
     args = parser.parse_args()
+
+    # deploy to Heroku port
+    port = int(os.environ.get('PORT', 8000))
     
     print("yo4")
-    app.run(debug=True, host=args.host, port=args.port)
+    app.run(debug=True, host=args.host, port=port)
