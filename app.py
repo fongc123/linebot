@@ -40,7 +40,7 @@ OPENAI_MESSAGES = [
         "content" : None
     }
 ]
-AUTHORIZATION_KEYWORD = "suipiss"
+AUTHORIZATION_BEARER_KEYWORD = "suipiss"
 
 app = Flask(__name__)
 
@@ -82,7 +82,7 @@ def callback():
 
 @app.route("/messages/send", methods=['POST'])
 def send_message():
-    if request.headers.get("Authorization") != AUTHORIZATION_KEYWORD:
+    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization"}), 401
 
     body = request.get_json()
