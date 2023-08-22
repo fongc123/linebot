@@ -59,10 +59,10 @@ def generate_response(userId, text):
 
     # check if user.json exists, if not load default, else load user.json
     messages = None
-    if not os.path.exists(f"/conversations/{userId}.json"):
+    if not os.path.exists(f"./conversations/{userId}.json"):
         messages = deepcopy(OPENAI_MESSAGES)    
     else:
-        with open(f"/conversations/{userId}.json", "r") as f:
+        with open(f"./conversations/{userId}.json", "r") as f:
             messages = json.load(f)
     messages.append({ "role" : "user", "content" : text })
 
