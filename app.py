@@ -37,10 +37,6 @@ OPENAI_MESSAGES = [
     {
         "role" : "system",
         "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply if they mention the keyword 'suipiss'."
-    },
-    {
-        "role" : "user",
-        "content" : None
     }
 ]
 AUTHORIZATION_BEARER_KEYWORD = "suipiss"
@@ -127,16 +123,12 @@ def send_message():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    userId = event.source.user_id
-    print(userId)
-
-    openai_response = generate_response(userId, event.message.text)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=openai_response)]
+                messages=[TextMessage(text=generate_response(event.source.user_id, event.message.text))]
             )
         )
 
