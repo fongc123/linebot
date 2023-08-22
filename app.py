@@ -32,10 +32,6 @@ app = Flask(__name__)
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-def save_json(data, filename='data.json'):
-    with open(filename,'w') as f:
-        json.dump(data, f, indent=4)
-
 @app.route("/callback", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
@@ -44,8 +40,9 @@ def callback():
     # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
-    for event in body['events']:
-        save_json(event, event['type'] + '.json')
+
+    data = json.loads(body)
+    print(data)
 
     # handle webhook body
     try:
