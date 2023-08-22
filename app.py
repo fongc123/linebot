@@ -41,9 +41,6 @@ def callback():
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
 
-    data = json.loads(body)
-    print(data)
-
     # handle webhook body
     try:
         handler.handle(body, signature)
@@ -51,9 +48,9 @@ def callback():
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
-    return (json.dumps({"status" : "OK"}), 200)
+    return json.dumps({"status" : "OK"}), 200
 
-@handler.add(MessageEvent, message=TextMessage)
+@handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
