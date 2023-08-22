@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import os
 import openai
 from copy import deepcopy
+import json
 
 from linebot.v3 import (
     WebhookHandler
@@ -49,18 +50,37 @@ app = Flask(__name__)
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-def generate_response(text):
+def save_file(filename, content):
+    with open(filename, "w") as f:
+        f.write(content)
+
+def generate_response(userId, text):
     openai.api_key = OPENAPI_KEY
 
-    messages = deepcopy(OPENAI_MESSAGES)
-    messages[1]["content"] = text
+    # check if conversations folder exists
+    if not os.path.exists("conversations"):
+        os.mkdir("conversations")
+
+    # check if user.json exists, if not load default, else load user.json
+    messages = None
+    if not os.path.exists(f"conversations/{userId}.json"):
+        messages = deepcopy(OPENAI_MESSAGES)    
+    else:
+        with open(f"conversations/{userId}.json", "r") as f:
+            messages = json.load(f)
+    messages.append({ "role" : "user", "content" : text })
 
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=messages,
         temperature=0.3,
         max_tokens=1000,
-    )
+    )['choices'][0]['message']['content']
+
+    # save user.json
+    messages.append({ "role" : "system", "content" : response })
+    with open(f"conversations/{userId}.json", "w") as f:
+        json.dump(messages, f)
 
     return response
 
@@ -107,12 +127,16 @@ def send_message():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
+    userId = event.source.user_id
+    print(event.__dict__)
+
+    openai_response = generate_response(userId, event.message.text)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=generate_response(event.message.text)['choices'][0]['message']['content'])]
+                messages=[TextMessage(text=openai_response)]
             )
         )
 
