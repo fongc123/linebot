@@ -54,15 +54,15 @@ def generate_response(userId, text):
     openai.api_key = OPENAPI_KEY
 
     # check if conversations folder exists
-    if not os.path.exists("conversations"):
-        os.mkdir("conversations")
+    if not os.path.exists("./conversations/"):
+        os.mkdir("./conversations/")
 
     # check if user.json exists, if not load default, else load user.json
     messages = None
-    if not os.path.exists(f"conversations/{userId}.json"):
+    if not os.path.exists(f"/conversations/{userId}.json"):
         messages = deepcopy(OPENAI_MESSAGES)    
     else:
-        with open(f"conversations/{userId}.json", "r") as f:
+        with open(f"/conversations/{userId}.json", "r") as f:
             messages = json.load(f)
     messages.append({ "role" : "user", "content" : text })
 
@@ -75,7 +75,7 @@ def generate_response(userId, text):
 
     # save user.json
     messages.append({ "role" : "system", "content" : response })
-    with open(f"conversations/{userId}.json", "w") as f:
+    with open(f"./conversations/{userId}.json", "w") as f:
         json.dump(messages, f)
 
     return response
