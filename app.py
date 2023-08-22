@@ -23,7 +23,8 @@ from linebot.v3.messaging import (
 
 from linebot.v3.webhooks import (
     MessageEvent,
-    TextMessageContent
+    TextMessageContent,
+    ImageMessageContent
 )
 
 CHANNEL_ACCESS_TOKEN = "QQiVYpwcXYAhYrQ0mCDNU8y+iv18MS7PDHoYs4WexlDQ4ZUFtiop0BTVqiWpL+bun9fJfOMgGfdxbeS3oaPzRa7j+zmb6kNcrSBFLkentJ4QPdBjv96OgOPoSUxvRWnetva7nOHqFsRk9am/s2k0kwdB04t89/1O/w1cDnyilFU="
@@ -39,6 +40,7 @@ OPENAI_MESSAGES = [
         "content" : None
     }
 ]
+AUTHORIZATION_KEYWORD = "suipiss"
 
 app = Flask(__name__)
 
@@ -78,6 +80,24 @@ def callback():
 
     return json.dumps({"status" : "OK"}), 200
 
+@app.route("/messages/send", methods=['POST'])
+def send_message():
+    if request.headers.get("Authorization") != AUTHORIZATION_KEYWORD:
+        return json.dumps({"status" : "Incorrect authorization"}), 401
+
+    body = request.get_json()
+    user_id = body["user_id"]
+    message = body["message"]
+
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.push_message_with_http_info(
+            user_id,
+            TextMessage(text=message)
+        )
+
+    return json.dumps({"status" : "OK"}), 200
+
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     with ApiClient(configuration) as api_client:
@@ -86,6 +106,17 @@ def handle_message(event):
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=generate_response(event.message.text)['choices'][0]['message']['content'])]
+            )
+        )
+
+@handler.add(MessageEvent, message=ImageMessageContent)
+def handle_image(event):
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message_with_http_info(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text="I can't see images yet.")]
             )
         )
 
