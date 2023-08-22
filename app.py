@@ -128,7 +128,7 @@ def send_message():
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     userId = event.source.user_id
-    print(event.__dict__)
+    print(userId)
 
     openai_response = generate_response(userId, event.message.text)
     with ApiClient(configuration) as api_client:
