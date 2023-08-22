@@ -29,7 +29,7 @@ from linebot.v3.webhooks import (
 CHANNEL_ACCESS_TOKEN = "QQiVYpwcXYAhYrQ0mCDNU8y+iv18MS7PDHoYs4WexlDQ4ZUFtiop0BTVqiWpL+bun9fJfOMgGfdxbeS3oaPzRa7j+zmb6kNcrSBFLkentJ4QPdBjv96OgOPoSUxvRWnetva7nOHqFsRk9am/s2k0kwdB04t89/1O/w1cDnyilFU="
 CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
 OPENAPI_KEY = "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"
-OPENAI_MESSAGES = {
+OPENAI_MESSAGES = [
     {
         "role" : "system",
         "content" : "You are a professional Japanese otaku."
@@ -38,7 +38,7 @@ OPENAI_MESSAGES = {
         "role" : "user",
         "content" : None
     }
-}
+]
 
 app = Flask(__name__)
 
