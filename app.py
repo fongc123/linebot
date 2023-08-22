@@ -19,6 +19,7 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage,
+    PushMessageRequest
 )
 
 from linebot.v3.webhooks import (
@@ -33,7 +34,7 @@ OPENAPI_KEY = "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"
 OPENAI_MESSAGES = [
     {
         "role" : "system",
-        "content" : "You are a professional Japanese otaku."
+        "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply if they mention the keyword 'suipiss'."
     },
     {
         "role" : "user",
@@ -80,7 +81,7 @@ def callback():
 
     return json.dumps({"status" : "OK"}), 200
 
-@app.route("/messages/send", methods=['POST'])
+@app.route("/admin/send_message", methods=['POST'])
 def send_message():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization"}), 401
@@ -91,10 +92,15 @@ def send_message():
 
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
-        line_bot_api.push_message_with_http_info(
-            user_id,
-            TextMessage(text=message)
+        push_message_request = PushMessageRequest(
+            to=user_id,
+            messages=[TextMessage(text=message)]
         )
+
+        try:
+            line_bot_api.push_message(push_message_request)
+        except Exception as e:
+            return json.dumps({"status" : str(e)}), 500
 
     return json.dumps({"status" : "OK"}), 200
 
