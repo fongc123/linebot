@@ -19,7 +19,8 @@ from linebot.v3.messaging import (
     MessagingApi,
     ReplyMessageRequest,
     TextMessage,
-    PushMessageRequest
+    PushMessageRequest,
+    ImageMessage
 )
 
 from linebot.v3.webhooks import (
@@ -81,28 +82,49 @@ def callback():
 
     return json.dumps({"status" : "OK"}), 200
 
-@app.route("/admin/send_message", methods=['POST'])
+@app.route("/admin/send/message", methods=['POST'])
 def send_message():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization"}), 401
 
     body = request.get_json()
-    user_id = body["user_id"]
-    message = body["message"]
+    try:
+        if "userId" in body.keys() and "message" in body.keys():
+            with ApiClient(configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                push_message_request = PushMessageRequest(
+                    to=body["user_id"],
+                    messages=[TextMessage(text=body["message"])]
+                )
 
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        push_message_request = PushMessageRequest(
-            to=user_id,
-            messages=[TextMessage(text=message)]
-        )
-
-        try:
-            line_bot_api.push_message(push_message_request)
-        except Exception as e:
-            return json.dumps({"status" : str(e)}), 500
+                line_bot_api.push_message(push_message_request)
+        else:
+            raise Exception("Missing userId or message")
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
 
     return json.dumps({"status" : "OK"}), 200
+
+@app.route("/admin/send/image", methods=['POST'])
+def send_image():
+    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+        return json.dumps({"status" : "Incorrect authorization"}), 401
+    
+    body = request.get_json()
+    try:
+        if "userId" in body.keys() and "image" in body.keys():
+            with ApiClient(configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                push_message_request = PushMessageRequest(
+                    to=body["user_id"],
+                    messages=[ImageMessage(content=body["image"])]
+                )
+
+                line_bot_api.push_message(push_message_request)
+        else:
+            raise Exception("Missing userId or image")
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
