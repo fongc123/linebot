@@ -5,6 +5,7 @@ import os
 import openai
 from copy import deepcopy
 import json
+import os
 
 from linebot.v3 import (
     WebhookHandler
@@ -30,16 +31,12 @@ from linebot.v3.webhooks import (
     ImageMessageContent
 )
 
-CHANNEL_ACCESS_TOKEN = "QQiVYpwcXYAhYrQ0mCDNU8y+iv18MS7PDHoYs4WexlDQ4ZUFtiop0BTVqiWpL+bun9fJfOMgGfdxbeS3oaPzRa7j+zmb6kNcrSBFLkentJ4QPdBjv96OgOPoSUxvRWnetva7nOHqFsRk9am/s2k0kwdB04t89/1O/w1cDnyilFU="
-CHANNEL_SECRET = "c722da9d4e41022ae6906b14b82b9545"
-OPENAPI_KEY = "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"
 OPENAI_MESSAGES = [
     {
         "role" : "system",
         "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply if they mention the keyword 'suipiss'."
     }
 ]
-AUTHORIZATION_BEARER_KEYWORD = "admin"
 
 app = Flask(__name__)
 
@@ -150,5 +147,10 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="host")
     opts = parser.parse_args()
     port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
+
+    AUTHORIZATION_BEARER_KEYWORD = "admin"
+    CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
+    CHANNEL_SECRET = os.getenv("CHANNEL_SECRET")
+    OPENAPI_KEY = os.getenv("OPENAPI_KEY")
 
     app.run(debug=True, host=opts.host, port=port)
