@@ -51,33 +51,40 @@ def save_file(filename, content):
     with open(filename, "w") as f:
         f.write(content)
 
+def insert_record(data):
+    print(data)
+
 def generate_response(userId, text):
     openai.api_key = OPENAPI_KEY
 
-    # check if conversations folder exists
-    if not os.path.exists("./conversations/"):
-        os.mkdir("./conversations/")
-
-    # check if user.json exists, if not load default, else load user.json
-    messages = None
-    if not os.path.exists(f"./conversations/{userId}.json"):
-        messages = deepcopy(OPENAI_MESSAGES)    
+    if text.startswith("!reg"):
+        # initialize register: !reg <LINE_ID> <PHONE_NUMBER> <EMAIL>
+        insert_record(text.split()[1:])
     else:
-        with open(f"./conversations/{userId}.json", "r") as f:
-            messages = json.load(f)
-    messages.append({ "role" : "user", "content" : text })
+        # check if conversations folder exists
+        if not os.path.exists("./conversations/"):
+            os.mkdir("./conversations/")
 
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        temperature=0.3,
-        max_tokens=1000,
-    )['choices'][0]['message']['content']
+        # check if user.json exists, if not load default, else load user.json
+        messages = None
+        if not os.path.exists(f"./conversations/{userId}.json"):
+            messages = deepcopy(OPENAI_MESSAGES)    
+        else:
+            with open(f"./conversations/{userId}.json", "r") as f:
+                messages = json.load(f)
+        messages.append({ "role" : "user", "content" : text })
 
-    # save user.json
-    messages.append({ "role" : "system", "content" : response })
-    with open(f"./conversations/{userId}.json", "w") as f:
-        json.dump(messages, f)
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            temperature=0.3,
+            max_tokens=1000,
+        )['choices'][0]['message']['content']
+
+        # save user.json
+        messages.append({ "role" : "system", "content" : response })
+        with open(f"./conversations/{userId}.json", "w") as f:
+            json.dump(messages, f)
 
     return response
 
@@ -102,7 +109,7 @@ def callback():
 @app.route("/admin/send/message", methods=['POST'])
 def send_message():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
-        return json.dumps({"status" : "Incorrect authorization"}), 401
+        return json.dumps({"status" : "Incorrect authorization."}), 401
 
     body = request.get_json()
     try:
@@ -116,11 +123,19 @@ def send_message():
 
                 line_bot_api.push_message(push_message_request)
         else:
-            raise Exception("Missing userId or message")
+            raise Exception("Missing userId or message.")
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
     return json.dumps({"status" : "OK"}), 200
+
+@app.route("/admin/send/image", methods=['POST'])
+def send_image():
+    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+        return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    # load image
+    body = request.get_json()
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
