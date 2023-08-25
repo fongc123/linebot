@@ -10,7 +10,6 @@ import json
 import uuid
 import os
 import io
-import requests
 
 from linebot.v3 import (
     WebhookHandler
@@ -118,9 +117,6 @@ def save_image(path, data, target_size):
 
 @app.route("/", methods=["GET"])
 def hello():
-    domain = request.host_url
-    print(domain)
-
     return json.dumps({"status" : "OK."}), 200
 
 @app.route("/callback", methods=['POST'])
@@ -141,24 +137,24 @@ def callback():
 
     return json.dumps({"status" : "OK."}), 200
 
-@app.route("/admin/send/message", methods=['POST'])
-def send_message():
+@app.route("/admin/send/text", methods=['POST'])
+def send_text():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
 
     body = request.get_json()
     try:
-        if "userId" in body.keys() and "message" in body.keys():
+        if "userId" in body.keys() and "text" in body.keys():
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
-                    messages=[TextMessage(text=body["message"])]
+                    messages=[TextMessage(text=body["text"])]
                 )
 
                 line_bot_api.push_message(push_message_request)
         else:
-            raise Exception("Missing userId or message.")
+            raise Exception("Missing userId or text.")
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
@@ -173,16 +169,34 @@ def send_image():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
+    domain = request.host_url
+    
+    body = request.get_json()
     try:
-        # save image
-        body = request.get_json()
-        file_id = uuid.uuid4()
-        path_ori = f"{IMAGES_PATH}/{file_id}-original.png"
-        path_pre = f"{IMAGES_PATH}/{file_id}-preview.png"
-        if not save_image(f"{path_ori}.png", body["image"], IMAGE_ORIGINAL_SIZE) or not save_image(f"{path_pre}.png", body["image"], IMAGE_PREVIEW_SIZE):
-            raise Exception("Image too large. Please send an image less than 10MB.")
-        
+        if "userId" in body.keys() and "image" in body.keys():
+            # save image
+            file_id = uuid.uuid4()
 
+            # original and preview images
+            po = f"{IMAGES_PATH}/{file_id}-original.png"
+            pp = f"{IMAGES_PATH}/{file_id}-preview.png"
+            if not save_image(f"{po}.png", body["image"], IMAGE_ORIGINAL_SIZE) or not save_image(f"{pp}.png", body["image"], IMAGE_PREVIEW_SIZE):
+                raise Exception("Image too large. Max size: 10MB.")
+            
+            # send image
+            with ApiClient(configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                push_message_request = PushMessageRequest(
+                    to=body["userId"],
+                    messages=[ImageMessage(
+                        original_content_url=f"{domain}{IMAGES_PATH}/{file_id}-original.png",
+                        preview_image_url=f"{domain}{IMAGES_PATH}/{file_id}-preview.png"
+                    )]
+                )
+
+                line_bot_api.push_message(push_message_request)
+        else:
+            raise Exception("Missing userId or image.")
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
