@@ -1,11 +1,16 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, send_from_directory
 import json
 from argparse import ArgumentParser
 import os
 import openai
 from copy import deepcopy
+from PIL import Image
+import base64
 import json
+import uuid
 import os
+import io
+import requests
 
 from linebot.v3 import (
     WebhookHandler
@@ -31,6 +36,9 @@ from linebot.v3.webhooks import (
     ImageMessageContent
 )
 
+IMAGE_ORIGINAL_SIZE = 10*1024*1024
+IMAGE_PREVIEW_SIZE = 1024*1024
+IMAGES_PATH = "./images"
 CHANNEL_ACCESS_TOKEN = "CHANNEL_ACCESS_TOKEN"
 CHANNEL_SECRET = "CHANNEL_SECRET"
 AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
@@ -88,6 +96,31 @@ def generate_response(userId, text):
 
     return response
 
+def save_image(path, data, target_size):
+    # save and compress image from base64
+    image_data = io.BytesIO(base64.b64decode(data))
+    image = Image.open(image_data)
+
+    # resize image
+    quality = 100
+    current_size = len(image_data)
+    while current_size > target_size and quality > 0:
+        image.save(path, optimize=True, quality=quality)
+        with open(path, "rb") as f:
+            current_size = len(f.read())
+        quality -= 5
+    
+    if quality > 0:
+        image.save(path, optimize=True, quality=quality)
+        return True
+    else:
+        return False
+
+@app.route("/", methods=["GET"])
+def hello():
+    print(requests.get("https://api.ipify.org?format=json"))
+    return json.dumps({"status" : "OK."}), 200
+
 @app.route("/callback", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
@@ -104,7 +137,7 @@ def callback():
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
-    return json.dumps({"status" : "OK"}), 200
+    return json.dumps({"status" : "OK."}), 200
 
 @app.route("/admin/send/message", methods=['POST'])
 def send_message():
@@ -127,15 +160,31 @@ def send_message():
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
-    return json.dumps({"status" : "OK"}), 200
+    return json.dumps({"status" : "OK."}), 200
+
+@app.route("/images/<filename>")
+def serve_image(filename):
+    return send_from_directory(IMAGES_PATH, filename)
 
 @app.route("/admin/send/image", methods=['POST'])
 def send_image():
     if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
-    # load image
-    body = request.get_json()
+    try:
+        # save image
+        body = request.get_json()
+        file_id = uuid.uuid4()
+        path_ori = f"{IMAGES_PATH}/{file_id}-original.png"
+        path_pre = f"{IMAGES_PATH}/{file_id}-preview.png"
+        if not save_image(f"{path_ori}.png", body["image"], IMAGE_ORIGINAL_SIZE) or not save_image(f"{path_pre}.png", body["image"], IMAGE_PREVIEW_SIZE):
+            raise Exception("Image too large. Please send an image less than 10MB.")
+        
+
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
+
+    return json.dumps({"status" : "OK."}), 200
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
