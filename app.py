@@ -203,6 +203,22 @@ def send_image():
 
     return json.dumps({"status" : "OK."}), 200
 
+@app.route("/admin/get/user", methods=['GET'])
+def get_user():
+    if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+        return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    response = None
+    body = request.get_json()
+    try:
+        if "userId" in body.keys():
+            line_bot_api = MessagingApi(configuration)
+            response = line_bot_api.get_profile(body["userId"])
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
+
+    return json.dumps({"status" : "OK.", "message" : response}), 200
+
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     with ApiClient(configuration) as api_client:
