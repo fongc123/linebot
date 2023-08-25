@@ -31,6 +31,10 @@ from linebot.v3.webhooks import (
     ImageMessageContent
 )
 
+CHANNEL_ACCESS_TOKEN = "CHANNEL_ACCESS_TOKEN"
+CHANNEL_SECRET = "CHANNEL_SECRET"
+AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
+OPENAPI_KEY = os.getenv("OPENAPI_KEY")
 OPENAI_MESSAGES = [
     {
         "role" : "system",
@@ -40,8 +44,8 @@ OPENAI_MESSAGES = [
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(CHANNEL_SECRET)
+configuration = Configuration(access_token=os.getenv(CHANNEL_ACCESS_TOKEN))
+handler = WebhookHandler(os.getenv(CHANNEL_SECRET))
 
 def save_file(filename, content):
     with open(filename, "w") as f:
@@ -147,10 +151,5 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="0.0.0.0", help="host")
     opts = parser.parse_args()
     port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
-
-    AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
-    CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
-    CHANNEL_SECRET = os.getenv("CHANNEL_SECRET")
-    OPENAPI_KEY = os.getenv("OPENAPI_KEY")
 
     app.run(debug=True, host=opts.host, port=port)
