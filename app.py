@@ -172,26 +172,33 @@ def send_image():
     domain = request.host_url.replace("http://", "https://")
     body = request.get_json()
     try:
-        if "userId" in body.keys() and "image" in body.keys():
-            # original and preview images
-            original = compress_image(body["image"], IMAGE_ORIGINAL_SIZE)
-            preview = compress_image(body["image"], IMAGE_PREVIEW_SIZE)
+        if "userId" in body.keys() and ("image_data" in body.keys() or "image_url" in body.keys()):
+            if "image_data" in body.keys():
+                # original and preview images
+                original = compress_image(body["image_data"], IMAGE_ORIGINAL_SIZE)
+                preview = compress_image(body["image_data"], IMAGE_PREVIEW_SIZE)
 
-            # save images
-            if not os.path.exists(IMAGES_PATH):
-                os.mkdir(IMAGES_PATH)
-            original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
-            preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
-            
-            print(file_id)
+                # save images
+                if not os.path.exists(IMAGES_PATH):
+                    os.mkdir(IMAGES_PATH)
+                original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
+                preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
+                
+                print("File ID:", file_id)
+                original_content_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-original.png"
+                preview_image_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
+            elif "image_url" in body.keys():
+                original_content_url = body["image_url"]
+                preview_image_url = body["image_url"]
+
             # send image
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
                     messages=[ImageMessage(
-                        original_content_url=f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-original.png",
-                        preview_image_url=f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
+                        original_content_url=original_content_url,
+                        preview_image_url=preview_image_url
                     )]
                 )
 
@@ -215,7 +222,7 @@ def get_user():
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 response = line_bot_api.get_profile(body["userId"]).dict()
-                print(response)
+                print("User Info:", response)
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
