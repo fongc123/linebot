@@ -167,7 +167,7 @@ def send_image():
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
     file_id = uuid.uuid4()
-    domain = request.host_url
+    domain = request.host_url.replace("http://", "https://")
     body = request.get_json()
     try:
         if "userId" in body.keys() and "image" in body.keys():
@@ -176,6 +176,8 @@ def send_image():
             preview = compress_image(body["image"], IMAGE_PREVIEW_SIZE)
 
             # save images
+            if not os.path.exists(IMAGES_PATH):
+                os.mkdir(IMAGES_PATH)
             original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
             preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
             
