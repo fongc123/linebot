@@ -95,29 +95,26 @@ def generate_response(userId, text):
 
     return response
 
-def save_image(path, data, target_size):
+def compress_image(data, target_size):
     # save and compress image from base64
-    image_data = io.BytesIO(base64.b64decode(data))
-    image = Image.open(image_data)
+    image = Image.open(io.BytesIO(base64.b64decode(data)))
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    output = io.BytesIO()
 
-    # resize image
     quality = 100
-    current_size = len(image_data)
-    while current_size > target_size and quality > 0:
-        image.save(path, optimize=True, quality=quality)
-        with open(path, "rb") as f:
-            current_size = len(f.read())
+    while True:
+        image.save(output, format="JPEG", optimize=True, quality=quality)
+        if len(output.getvalue()) <= target_size:
+            break
+        if quality <= 0:
+            raise Exception("Image too large. Max size: 10MB.")
+        
         quality -= 5
-    
-    if quality > 0:
-        image.save(path, optimize=True, quality=quality)
-        return True
-    else:
-        return False
+        output.seek(0)
+        output.truncate()
 
-@app.route("/", methods=["GET"])
-def hello():
-    return json.dumps({"status" : "OK."}), 200
+    return Image.open(io.BytesIO(output.getvalue()))
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -139,7 +136,7 @@ def callback():
 
 @app.route("/admin/send/text", methods=['POST'])
 def send_text():
-    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+    if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
 
     body = request.get_json()
@@ -166,22 +163,21 @@ def serve_image(filename):
 
 @app.route("/admin/send/image", methods=['POST'])
 def send_image():
-    if request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+    if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
+    file_id = uuid.uuid4()
     domain = request.host_url
-    
     body = request.get_json()
     try:
         if "userId" in body.keys() and "image" in body.keys():
-            # save image
-            file_id = uuid.uuid4()
-
             # original and preview images
-            po = f"{IMAGES_PATH}/{file_id}-original.png"
-            pp = f"{IMAGES_PATH}/{file_id}-preview.png"
-            if not save_image(f"{po}.png", body["image"], IMAGE_ORIGINAL_SIZE) or not save_image(f"{pp}.png", body["image"], IMAGE_PREVIEW_SIZE):
-                raise Exception("Image too large. Max size: 10MB.")
+            original = compress_image(body["image"], IMAGE_ORIGINAL_SIZE)
+            preview = compress_image(body["image"], IMAGE_PREVIEW_SIZE)
+
+            # save images
+            original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
+            preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
             
             # send image
             with ApiClient(configuration) as api_client:
