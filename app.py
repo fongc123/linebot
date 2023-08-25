@@ -157,7 +157,7 @@ def send_text():
 
     return json.dumps({"status" : "OK."}), 200
 
-@app.route("/images/<filename>")
+@app.route(f"{IMAGES_PATH.replace('.', '')}/<filename>")
 def serve_image(filename):
     return send_from_directory(IMAGES_PATH, filename)
 
@@ -188,8 +188,8 @@ def send_image():
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
                     messages=[ImageMessage(
-                        original_content_url=f"{domain}{file_id}-original.png",
-                        preview_image_url=f"{domain}{file_id}-preview.png"
+                        original_content_url=f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-original.png",
+                        preview_image_url=f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
                     )]
                 )
 
