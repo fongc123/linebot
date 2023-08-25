@@ -39,7 +39,7 @@ OPENAI_MESSAGES = [
         "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply if they mention the keyword 'suipiss'."
     }
 ]
-AUTHORIZATION_BEARER_KEYWORD = "suipiss"
+AUTHORIZATION_BEARER_KEYWORD = "admin"
 
 app = Flask(__name__)
 
