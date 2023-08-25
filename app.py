@@ -212,8 +212,9 @@ def get_user():
     body = request.get_json()
     try:
         if "userId" in body.keys():
-            line_bot_api = MessagingApi(configuration)
-            response = line_bot_api.get_profile(body["userId"])
+            with ApiClient(configuration) as api_client:
+                line_bot_api = MessagingApi(api_client)
+                response = line_bot_api.get_profile(body["userId"])
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
