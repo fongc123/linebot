@@ -118,7 +118,9 @@ def save_image(path, data, target_size):
 
 @app.route("/", methods=["GET"])
 def hello():
-    print(requests.get("https://api.ipify.org?format=json").json()['ip'])
+    domain = request.host_url
+    print(domain)
+
     return json.dumps({"status" : "OK."}), 200
 
 @app.route("/callback", methods=['POST'])
