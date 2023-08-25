@@ -58,15 +58,17 @@ def save_file(filename, content):
     with open(filename, "w") as f:
         f.write(content)
 
-def insert_record(data):
-    print(data)
+def insert_record(userId, data):
+    print(userId, data)
 
 def generate_response(userId, text):
     openai.api_key = OPENAPI_KEY
 
     if text.startswith("!reg"):
         # initialize register: !reg <LINE_ID> <PHONE_NUMBER> <EMAIL>
-        insert_record(text.split()[1:])
+        insert_record(userId, text.split()[1:])
+
+        response = "You have been registered."
     else:
         # check if conversations folder exists
         if not os.path.exists("./conversations/"):
