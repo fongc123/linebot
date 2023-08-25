@@ -148,7 +148,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
 
-    AUTHORIZATION_BEARER_KEYWORD = "admin"
+    AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
     CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
     CHANNEL_SECRET = os.getenv("CHANNEL_SECRET")
     OPENAPI_KEY = os.getenv("OPENAPI_KEY")
