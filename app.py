@@ -187,8 +187,8 @@ def send_image():
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
                     messages=[ImageMessage(
-                        original_content_url=f"{domain}{IMAGES_PATH}/{file_id}-original.png",
-                        preview_image_url=f"{domain}{IMAGES_PATH}/{file_id}-preview.png"
+                        original_content_url=f"{domain}{file_id}-original.png",
+                        preview_image_url=f"{domain}{file_id}-preview.png"
                     )]
                 )
 
