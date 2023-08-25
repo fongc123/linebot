@@ -181,6 +181,7 @@ def send_image():
             original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
             preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
             
+            print(file_id)
             # send image
             with ApiClient(configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
