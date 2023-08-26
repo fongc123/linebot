@@ -139,6 +139,7 @@ def delete_images():
         file_time = datetime.datetime.fromtimestamp(os.path.getmtime(f"{IMAGES_PATH}/{filename}"))
         if (current_time - file_time).days >= IMAGE_EXPIRY:
             os.remove(f"{IMAGES_PATH}/{filename}")
+            print("Deleted:", filename)
 
 def run_schedule():
     while True:
@@ -241,9 +242,6 @@ def send_image():
                 )
 
                 line_bot_api.push_message(push_message_request)
-
-            # delete images after 3 days
-            os.system(f"sleep 259200 && rm {IMAGES_PATH}/{file_id}-original.png {IMAGES_PATH}/{file_id}-preview.png &")
         else:
             raise Exception("Missing userId or image.")
     except Exception as e:
@@ -307,10 +305,6 @@ def handle_image(event):
 @handler.add(FollowEvent)
 def handle_follow(event):
     print("Follow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id) })
-
-@handler.add(UnfollowEvent)
-def handle_unfollow(event):
-    print("Unfollow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id)})
 
 if __name__ == "__main__":
     parser = ArgumentParser(
