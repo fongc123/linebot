@@ -61,6 +61,7 @@ app = Flask(__name__)
 
 configuration = Configuration(access_token=os.getenv(CHANNEL_ACCESS_TOKEN))
 handler = WebhookHandler(os.getenv(CHANNEL_SECRET))
+use_openai = False
 
 def save_file(filename, content):
     with open(filename, "w") as f:
@@ -70,18 +71,15 @@ def insert_record(userId, data):
     print(userId, data)
 
 def generate_response(userId, text):
+    global use_openai
     openai.api_key = OPENAPI_KEY
 
-    if text.startswith("!reg"):
-        # initialize register: !reg <LINE_ID> <PHONE_NUMBER> <EMAIL>
-        insert_record(userId, text.split()[1:])
+    # check if conversations folder exists
+    if not os.path.exists("./conversations/"):
+        os.mkdir("./conversations/")
 
-        response = "You have been registered."
-    else:
-        # check if conversations folder exists
-        if not os.path.exists("./conversations/"):
-            os.mkdir("./conversations/")
-
+    response = "Sorry, but I cannot process your request."
+    if use_openai:
         # check if user.json exists, if not load default, else load user.json
         messages = None
         if not os.path.exists(f"./conversations/{userId}.json"):
@@ -311,6 +309,7 @@ if __name__ == "__main__":
         usage="Usage: python " + __file__ + " [--host <host>] [--help]"
     )
     parser.add_argument("--host", default="0.0.0.0", help="host")
+    parser.add_argument("--chat", type=bool, default=False, help="Use OpenAI API to respond to non-system messages.")
     opts = parser.parse_args()
     port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
 
@@ -320,4 +319,5 @@ if __name__ == "__main__":
     schedule_thread.start()
 
     # run app
+    use_openai = opts.chat
     app.run(debug=True, host=opts.host, port=port)
