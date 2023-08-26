@@ -5,7 +5,12 @@ import os
 import openai
 from copy import deepcopy
 from PIL import Image
+import threading
+import requests
+import schedule
+import datetime
 import base64
+import time
 import json
 import uuid
 import os
@@ -38,6 +43,7 @@ from linebot.v3.webhooks import (
 IMAGE_ORIGINAL_SIZE = 10*1024*1024
 IMAGE_PREVIEW_SIZE = 1024*1024
 IMAGES_PATH = "./images"
+IMAGE_EXPIRY = 3 # 3 days
 CHANNEL_ACCESS_TOKEN = "CHANNEL_ACCESS_TOKEN"
 CHANNEL_SECRET = "CHANNEL_SECRET"
 AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
@@ -118,6 +124,20 @@ def compress_image(data, target_size):
 
     return Image.open(io.BytesIO(output.getvalue()))
 
+def delete_images():
+    current_time = datetime.datetime.now()
+    for filename in os.listdir(IMAGES_PATH):
+        if not filename.endswith(".png"):
+            continue
+        file_time = datetime.datetime.fromtimestamp(os.path.getmtime(f"{IMAGES_PATH}/{filename}"))
+        if (current_time - file_time).days >= IMAGE_EXPIRY:
+            os.remove(f"{IMAGES_PATH}/{filename}")
+
+def run_schedule():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
 @app.route("/callback", methods=['POST'])
 def callback():
     # get X-Line-Signature header value
@@ -168,9 +188,12 @@ def send_image():
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
+    if not os.path.exists(IMAGES_PATH):
+        os.mkdir(IMAGES_PATH)
     file_id = uuid.uuid4()
     domain = request.host_url.replace("http://", "https://")
     body = request.get_json()
+    print("File ID:", file_id)
     try:
         if "userId" in body.keys() and ("image_data" in body.keys() or "image_url" in body.keys()):
             if "image_data" in body.keys():
@@ -179,17 +202,25 @@ def send_image():
                 preview = compress_image(body["image_data"], IMAGE_PREVIEW_SIZE)
 
                 # save images
-                if not os.path.exists(IMAGES_PATH):
-                    os.mkdir(IMAGES_PATH)
                 original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
                 preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
                 
-                print("File ID:", file_id)
                 original_content_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-original.png"
                 preview_image_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
             elif "image_url" in body.keys():
-                original_content_url = body["image_url"]
-                preview_image_url = body["image_url"]
+                image_response = requests.get(body["image_url"])
+                if image_response.status_code != 200:
+                    raise Exception(f"Failed to get image ({image_response.status_code}).")
+                
+                original = compress_image(base64.b64encode(image_response.content), IMAGE_ORIGINAL_SIZE)
+                preview = compress_image(base64.b64encode(image_response.content), IMAGE_PREVIEW_SIZE)
+                
+                # save images
+                original.save(f"{IMAGES_PATH}/{file_id}-original.png", format="PNG")
+                preview.save(f"{IMAGES_PATH}/{file_id}-preview.png", format="PNG")
+
+                original_content_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-original.png"
+                preview_image_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
 
             # send image
             with ApiClient(configuration) as api_client:
@@ -203,6 +234,9 @@ def send_image():
                 )
 
                 line_bot_api.push_message(push_message_request)
+
+            # delete images after 3 days
+            os.system(f"sleep 259200 && rm {IMAGES_PATH}/{file_id}-original.png {IMAGES_PATH}/{file_id}-preview.png &")
         else:
             raise Exception("Missing userId or image.")
     except Exception as e:
@@ -258,4 +292,10 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     port = int(os.environ.get("PORT", 8000)) # deploy to Heroku port
 
+    # schedule to delete images
+    schedule.every().day.at("00:00").do(delete_images)
+    schedule_thread = threading.Thread(target=run_schedule)
+    schedule_thread.start()
+
+    # run app
     app.run(debug=True, host=opts.host, port=port)
