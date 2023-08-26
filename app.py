@@ -260,7 +260,29 @@ def get_user():
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
-    return json.dumps({"status" : "OK.", "message" : response}), 200
+    return json.dumps({"status" : "OK.", "data" : response}), 200
+
+@app.route("/admin/get/followers", methods=['GET'])
+def get_followers():
+    if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
+        return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    param_limit = None
+    param_start = None
+    response = None
+    body = request.get_json()
+    try:
+        if "start" in body.keys():
+            param_start = body["start"]
+        if "limit" in body.keys():
+            param_limit = body["limit"]
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            response = line_bot_api.get_followers(start=param_start, limit=param_limit).dict()
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
+    
+    return json.dumps({"status" : "OK.", "data" : response}), 200
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
