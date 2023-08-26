@@ -307,14 +307,6 @@ def handle_image(event):
 @handler.add(FollowEvent)
 def handle_follow(event):
     print("Follow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id) })
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        line_bot_api.reply_message_with_http_info(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text="Hello!")]
-            )
-        )
 
 @handler.add(UnfollowEvent)
 def handle_unfollow(event):
