@@ -37,7 +37,9 @@ from linebot.v3.messaging import (
 from linebot.v3.webhooks import (
     MessageEvent,
     TextMessageContent,
-    ImageMessageContent
+    ImageMessageContent,
+    FollowEvent,
+    UnfollowEvent
 )
 
 IMAGE_ORIGINAL_SIZE = 10*1024*1024
@@ -102,6 +104,11 @@ def generate_response(userId, text):
             json.dump(messages, f)
 
     return response
+
+def get_user_info(userId):
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        return line_bot_api.get_profile(userId).dict()
 
 def compress_image(data, target_size):
     # save and compress image from base64
@@ -253,32 +260,23 @@ def get_user():
     body = request.get_json()
     try:
         if "userId" in body.keys():
-            with ApiClient(configuration) as api_client:
-                line_bot_api = MessagingApi(api_client)
-                response = line_bot_api.get_profile(body["userId"]).dict()
-                print("User Info:", response)
+            response = get_user_info(body["userId"])
+            print("User Info:", response)
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
     return json.dumps({"status" : "OK.", "data" : response}), 200
 
-@app.route("/admin/get/followers", methods=['GET'])
-def get_followers():
+@app.route("/admin/get/botinfo", methods=['GET'])
+def get_bot_info():
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
-    param_limit = None
-    param_start = None
     response = None
-    body = request.get_json()
     try:
-        if "start" in body.keys():
-            param_start = body["start"]
-        if "limit" in body.keys():
-            param_limit = body["limit"]
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
-            response = line_bot_api.get_followers(start=param_start, limit=param_limit).dict()
+            response = line_bot_api.get_bot_info().dict()
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
     
@@ -305,6 +303,22 @@ def handle_image(event):
                 messages=[TextMessage(text="I can't see images yet.")]
             )
         )
+
+@handler.add(FollowEvent)
+def handle_follow(event):
+    print("Follow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id) })
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        line_bot_api.reply_message_with_http_info(
+            ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text="Hello!")]
+            )
+        )
+
+@handler.add(UnfollowEvent)
+def handle_unfollow(event):
+    print("Unfollow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id)})
 
 if __name__ == "__main__":
     parser = ArgumentParser(
