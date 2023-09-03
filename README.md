@@ -27,6 +27,11 @@ Ensure that a `.env` file is present to store secrets and access tokens. It shou
 - `AUTHORIZATION_BEARER_KEYWORD`: keyword for access to the API (*currently set as a static phrase*)
 - `CHANNEL_ACCESS_TOKEN`: channel access token from LINE
 - `CHANNEL_SECRET`: channel secret from LINE
+- `MSSQL_HOST`: Microsoft SQL hostname
+- `MSSQL_USER`: Microsoft SQL username
+- `MSSQL_PASSWORD`: Microsoft SQL password
+- `MSSQL_DATABASE`: Microsoft SQL database
+- `MSSQL_TABLE`: Microsoft SQL table name
 - `OPENAPI_KEY`: (OPTIONAL) OpenAPI key for chat bot
 
 A sample `POST` request to the `/admin/send/text` endpoint is shown below. Ensure that the Bearer authorization token is the same as that of in the `.env` file.

@@ -15,6 +15,7 @@ import json
 import uuid
 import os
 import io
+import pymssql
 
 from linebot.v3 import (
     WebhookHandler
@@ -46,21 +47,27 @@ IMAGE_ORIGINAL_SIZE = 10*1024*1024
 IMAGE_PREVIEW_SIZE = 1024*1024
 IMAGES_PATH = "./images"
 IMAGE_EXPIRY = 3 # 3 days
-CHANNEL_ACCESS_TOKEN = "CHANNEL_ACCESS_TOKEN"
-CHANNEL_SECRET = "CHANNEL_SECRET"
+BOT_NAMES = os.getenv("BOT_NAMES").split(",")
+CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN").split(",")
+CHANNEL_SECRET = os.getenv("CHANNEL_SECRET").split(",")
 AUTHORIZATION_BEARER_KEYWORD = os.getenv("AUTHORIZATION_BEARER_KEYWORD")
+MSSQL_HOST = os.getenv("MSSQL_HOST")
+MSSQL_USER = os.getenv("MSSQL_USER")
+MSSQL_PASSWORD = os.getenv("MSSQL_PASSWORD")
+MSSQL_DATABASE = os.getenv("MSSQL_DATABASE")
+MSSQL_TABLE = os.getenv("MSSQL_TABLE")
 OPENAPI_KEY = os.getenv("OPENAPI_KEY")
 OPENAI_MESSAGES = [
     {
         "role" : "system",
-        "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply if they mention the keyword 'suipiss'."
+        "content" : "You are an unhelpful assistant. You are relecutant to reply to the user's questions. However, you may reply only if they mention the keyword 'apple'."
     }
 ]
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token=os.getenv(CHANNEL_ACCESS_TOKEN))
-handler = WebhookHandler(os.getenv(CHANNEL_SECRET))
+configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[0])
+handler = WebhookHandler(CHANNEL_SECRET[0])
 use_openai = False
 
 def save_file(filename, content):
@@ -68,7 +75,27 @@ def save_file(filename, content):
         f.write(content)
 
 def insert_record(userId, data):
-    print(userId, data)
+    cursor = pymssql.connect(MSSQL_HOST, MSSQL_USER, MSSQL_PASSWORD, MSSQL_DATABASE).cursor()
+    _sql_create_table = f"""
+    IF OBJECT_ID('{MSSQL_TABLE}', 'U') IS NULL
+        CREATE TABLE {MSSQL_TABLE} (
+            userId VARCHAR(200) NOT NULL,
+            display_name VARCHAR(100),
+            picture_url VARCHAR(200),
+            language VARCHAR(10),
+            bot VARCHAR(200),
+            PRIMARY KEY (userId)
+        )
+    """
+    cursor.execute(_sql_create_table)
+    cursor.connection.commit()  
+
+    _sql_insert = f"""
+    INSERT INTO {MSSQL_TABLE} (userId, display_name, picture_url, language, bot) VALUES (%s, %s, %s, %s, %s)
+    """
+    values = [(userId, data['display_name'], data['picture_url'], data['language'], data['destination'])]
+    cursor.executemany(_sql_insert, values)
+    cursor.connection.commit()
 
 def generate_response(userId, text):
     global use_openai
@@ -103,10 +130,15 @@ def generate_response(userId, text):
 
     return response
 
-def get_user_info(userId):
-    with ApiClient(configuration) as api_client:
+def get_user_info(userId, access_token):
+    with ApiClient(Configuration(access_token=access_token)) as api_client:
         line_bot_api = MessagingApi(api_client)
         return line_bot_api.get_profile(userId).dict()
+    
+def get_bot_info(access_token):
+    with ApiClient(Configuration(access_token=access_token)) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        return line_bot_api.get_bot_info().dict()
 
 def compress_image(data, target_size):
     # save and compress image from base64
@@ -144,33 +176,44 @@ def run_schedule():
         schedule.run_pending()
         time.sleep(1)
 
-@app.route("/callback", methods=['POST'])
-def callback():
-    # get X-Line-Signature header value
-    signature = request.headers['X-Line-Signature']
+@app.route("/<bot_name>/callback", methods=['POST'])
+def callback(bot_name):
+    global handler
+    global configuration
 
-    # get request body as text
-    body = request.get_data(as_text=True)
-    app.logger.info("Request body: " + body)
-
-    # handle webhook body
     try:
+        if bot_name not in BOT_NAMES:
+            raise Exception("Incorrect bot name.")
+        
+        # get header information
+        signature = request.headers['X-Line-Signature']
+        body = request.get_data(as_text=True)
+        app.logger.info("Request body: " + body)
+
+        # handle webhook body
+        handler = WebhookHandler(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
+        configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
         handler.handle(body, signature)
+
+        return json.dumps({"status" : "OK."}), 200
     except InvalidSignatureError:
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
+    except Exception as e:
+        return json.dumps({"status" : str(e)}), 500
 
-    return json.dumps({"status" : "OK."}), 200
-
-@app.route("/admin/send/text", methods=['POST'])
-def send_text():
+@app.route("/<bot_name>/admin/send/text", methods=['POST'])
+def send_text(bot_name):
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    if bot_name not in BOT_NAMES:
+        return json.dumps({"status" : "Incorrect bot name."}), 401
 
     body = request.get_json()
     try:
         if "userId" in body.keys() and "text" in body.keys():
-            with ApiClient(configuration) as api_client:
+            with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
@@ -189,10 +232,13 @@ def send_text():
 def serve_image(filename):
     return send_from_directory(IMAGES_PATH, filename)
 
-@app.route("/admin/send/image", methods=['POST'])
-def send_image():
+@app.route("/<bot_name>/admin/send/image", methods=['POST'])
+def send_image(bot_name):
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    if bot_name not in BOT_NAMES:
+        return json.dumps({"status" : "Incorrect bot name."}), 401
     
     if not os.path.exists(IMAGES_PATH):
         os.mkdir(IMAGES_PATH)
@@ -229,7 +275,7 @@ def send_image():
                 preview_image_url = f"{domain}{IMAGES_PATH.replace('.', '')}/{file_id}-preview.png"
 
             # send image
-            with ApiClient(configuration) as api_client:
+            with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
                 line_bot_api = MessagingApi(api_client)
                 push_message_request = PushMessageRequest(
                     to=body["userId"],
@@ -247,32 +293,36 @@ def send_image():
 
     return json.dumps({"status" : "OK."}), 200
 
-@app.route("/admin/get/user", methods=['GET'])
-def get_user():
+@app.route("/<bot_name>/admin/get/user", methods=['GET'])
+def get_user(bot_name):
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
+    
+    if bot_name not in BOT_NAMES:
+        return json.dumps({"status" : "Incorrect bot name."}), 401
     
     response = None
     body = request.get_json()
     try:
         if "userId" in body.keys():
-            response = get_user_info(body["userId"])
+            response = get_user_info(body["userId"], CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
             print("User Info:", response)
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
 
     return json.dumps({"status" : "OK.", "data" : response}), 200
 
-@app.route("/admin/get/botinfo", methods=['GET'])
-def get_bot_info():
+@app.route("/<bot_name>/admin/get/botinfo", methods=['GET'])
+def get_bot_info(bot_name):
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
+    if bot_name not in BOT_NAMES:
+        return json.dumps({"status" : "Incorrect bot name."}), 401
+
     response = None
     try:
-        with ApiClient(configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            response = line_bot_api.get_bot_info().dict()
+        response = get_bot_info(CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
     
@@ -280,6 +330,7 @@ def get_bot_info():
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
+    global configuration
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
@@ -291,6 +342,7 @@ def handle_message(event):
 
 @handler.add(MessageEvent, message=ImageMessageContent)
 def handle_image(event):
+    global configuration
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
@@ -302,7 +354,13 @@ def handle_image(event):
 
 @handler.add(FollowEvent)
 def handle_follow(event):
-    print("Follow event received:", { "userId" : event.source.user_id, "user_info" : get_user_info(event.source.user_id) })
+    userId = event.source.user_id
+    user_info = get_user_info(userId)
+    user_info['userId'] = userId
+    user_info['destination'] = event.destination
+
+    insert_record(userId, user_info)
+    print("Follow event received:", user_info)
 
 if __name__ == "__main__":
     parser = ArgumentParser(
