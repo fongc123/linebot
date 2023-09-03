@@ -24,9 +24,10 @@ python app.py
 ```
 
 Ensure that a `.env` file is present to store secrets and access tokens. It should contain the following variables:
+- `BOT_NAMES`: bot names for endpoints (comma-separated values if multiple bots)
 - `AUTHORIZATION_BEARER_KEYWORD`: keyword for access to the API (*currently set as a static phrase*)
-- `CHANNEL_ACCESS_TOKEN`: channel access token from LINE
-- `CHANNEL_SECRET`: channel secret from LINE
+- `CHANNEL_ACCESS_TOKEN`: channel access token from LINE (comma-separated values if multiple bots)
+- `CHANNEL_SECRET`: channel secret from LINE (comma-separated values if multiple bots)
 - `MSSQL_HOST`: Microsoft SQL hostname
 - `MSSQL_USER`: Microsoft SQL username
 - `MSSQL_PASSWORD`: Microsoft SQL password
