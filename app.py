@@ -85,6 +85,7 @@ def insert_record(userId, data):
             picture_url VARCHAR(200),
             language VARCHAR(10),
             bot VARCHAR(200),
+            PRIMARY KEY (userId, bot)
         )
     """
     cursor.execute(_sql_create_table)
