@@ -18,7 +18,8 @@ import io
 import pymssql
 
 from linebot.v3 import (
-    WebhookHandler
+    WebhookHandler,
+    WebhookParser
 )
 
 from linebot.v3.exceptions import (
@@ -105,7 +106,7 @@ def generate_response(userId, text):
     if not os.path.exists("./conversations/"):
         os.mkdir("./conversations/")
 
-    response = "Sorry, but I cannot process your request."
+    response = "Sorry, but I cannot process your message."
     if use_openai:
         # check if user.json exists, if not load default, else load user.json
         messages = None
@@ -191,7 +192,7 @@ def callback(bot_name):
         app.logger.info("Request body: " + body)
 
         # handle webhook body
-        handler = WebhookHandler(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
+        handler.parser = WebhookParser(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
         configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
         handler.handle(body, signature)
 
