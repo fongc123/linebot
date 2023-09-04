@@ -98,6 +98,8 @@ def insert_record(userId, data):
     cursor.executemany(_sql_insert, values)
     cursor.connection.commit()
 
+    cursor.connection.close()
+
 def generate_response(userId, text):
     global use_openai
     openai.api_key = OPENAPI_KEY
@@ -135,11 +137,6 @@ def get_user_info(userId, access_token):
     with ApiClient(Configuration(access_token=access_token)) as api_client:
         line_bot_api = MessagingApi(api_client)
         return line_bot_api.get_profile(userId).dict()
-    
-def get_bot_info(access_token):
-    with ApiClient(Configuration(access_token=access_token)) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        return line_bot_api.get_bot_info().dict()
 
 def compress_image(data, target_size):
     # save and compress image from base64
@@ -164,13 +161,14 @@ def compress_image(data, target_size):
 
 def delete_images():
     current_time = datetime.datetime.now()
-    for filename in os.listdir(IMAGES_PATH):
-        if not filename.endswith(".png"):
-            continue
-        file_time = datetime.datetime.fromtimestamp(os.path.getmtime(f"{IMAGES_PATH}/{filename}"))
-        if (current_time - file_time).days >= IMAGE_EXPIRY:
-            os.remove(f"{IMAGES_PATH}/{filename}")
-            print("Deleted:", filename)
+    if os.path.exists(IMAGES_PATH):
+        for filename in os.listdir(IMAGES_PATH):
+            if not filename.endswith(".png"):
+                continue
+            file_time = datetime.datetime.fromtimestamp(os.path.getmtime(f"{IMAGES_PATH}/{filename}"))
+            if (current_time - file_time).days >= IMAGE_EXPIRY:
+                os.remove(f"{IMAGES_PATH}/{filename}")
+                print("Deleted:", filename)
 
 def run_schedule():
     while True:
@@ -323,7 +321,9 @@ def get_bot_info(bot_name):
 
     response = None
     try:
-        response = get_bot_info(CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
+        with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            response = line_bot_api.get_bot_info().dict()
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
     
@@ -355,13 +355,16 @@ def handle_image(event):
 
 @handler.add(FollowEvent)
 def handle_follow(event):
-    userId = event.source.user_id
-    user_info = get_user_info(userId)
-    user_info['userId'] = userId
-    user_info['destination'] = event.destination
+    try:
+        userId = event.source.user_id
+        user_info = get_user_info(userId)
+        user_info['userId'] = userId
+        user_info['destination'] = event.destination
 
-    insert_record(userId, user_info)
-    print("Follow event received:", user_info)
+        insert_record(userId, user_info)
+        print("Follow event received:", user_info)
+    except Exception as e:
+        print("Error:", str(e))
 
 if __name__ == "__main__":
     parser = ArgumentParser(
