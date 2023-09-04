@@ -367,6 +367,7 @@ def handle_image(event):
 @handler.add(FollowEvent)
 def handle_follow(event):
     try:
+        print(event)
         userId = event.source.user_id
         botId = event.destination
         user_info = get_user_info(userId, CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_user_ids[botId])])
