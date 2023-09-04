@@ -69,6 +69,7 @@ app = Flask(__name__)
 
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[0])
 handler = WebhookHandler(CHANNEL_SECRET[0])
+bot_user_ids = {}
 use_openai = False
 
 def save_file(filename, content):
@@ -137,6 +138,18 @@ def get_user_info(userId, access_token):
     with ApiClient(Configuration(access_token=access_token)) as api_client:
         line_bot_api = MessagingApi(api_client)
         return line_bot_api.get_profile(userId).dict()
+    
+def get_bot_info(access_token):
+    with ApiClient(Configuration(access_token=access_token)) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        return line_bot_api.get_bot_info().dict()
+    
+def get_all_bot_info():
+    global bot_user_ids
+    for name in BOT_NAMES:
+        data = get_bot_info(CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(name)])
+        bot_user_ids[data["user_id"]] = name
+    print("All bot info:", bot_user_ids)
 
 def compress_image(data, target_size):
     # save and compress image from base64
@@ -312,7 +325,7 @@ def get_user(bot_name):
     return json.dumps({"status" : "OK.", "data" : response}), 200
 
 @app.route("/<bot_name>/admin/get/botinfo", methods=['GET'])
-def get_bot_info(bot_name):
+def get_bot(bot_name):
     if request.headers.get("Authorization") is None or request.headers.get("Authorization").split()[1] != AUTHORIZATION_BEARER_KEYWORD:
         return json.dumps({"status" : "Incorrect authorization."}), 401
     
@@ -321,9 +334,7 @@ def get_bot_info(bot_name):
 
     response = None
     try:
-        with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            response = line_bot_api.get_bot_info().dict()
+        response = get_bot_info(CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
     except Exception as e:
         return json.dumps({"status" : str(e)}), 500
     
@@ -357,9 +368,10 @@ def handle_image(event):
 def handle_follow(event):
     try:
         userId = event.source.user_id
-        user_info = get_user_info(userId)
+        botId = event.destination
+        user_info = get_user_info(userId, CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_user_ids[botId])])
         user_info['userId'] = userId
-        user_info['destination'] = event.destination
+        user_info['destination'] = botId
 
         insert_record(userId, user_info)
         print("Follow event received:", user_info)
@@ -379,6 +391,9 @@ if __name__ == "__main__":
     schedule.every().day.at("00:00").do(delete_images)
     schedule_thread = threading.Thread(target=run_schedule)
     schedule_thread.start()
+
+    # get all bot info
+    get_all_bot_info()
 
     # run app
     use_openai = opts.chat
