@@ -194,14 +194,14 @@ def callback(bot_name):
         body = request.get_data(as_text=True)
         app.logger.info("Request body: " + body)
 
-        # handle webhook body
-        handler.parser = WebhookParser(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
-        handler.handle(body, signature)
-
         # store incoming messages by webhookEventId
         print(body["events"])
         for event in body["events"]:
             message_destinations[event["webhookEventId"]] = bot_name
+
+        # handle webhook body
+        handler.parser = WebhookParser(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
+        handler.handle(body, signature)
 
         return json.dumps({"status" : "OK."}), 200
     except InvalidSignatureError:
