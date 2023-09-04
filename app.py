@@ -67,9 +67,8 @@ OPENAI_MESSAGES = [
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[0])
 handler = WebhookHandler(CHANNEL_SECRET[0])
-bot_user_ids = {}
+message_destinations = {}
 use_openai = False
 
 def save_file(filename, content):
@@ -95,7 +94,7 @@ def insert_record(userId, data):
     _sql_insert = f"""
     INSERT INTO {MSSQL_TABLE} (userId, display_name, picture_url, language, bot) VALUES (%s, %s, %s, %s, %s)
     """
-    values = [(userId, data['display_name'], data['picture_url'], data['language'], data['destination'])]
+    values = [(userId, data['display_name'], data['picture_url'], data['language'], data['bot'])]
     cursor.executemany(_sql_insert, values)
     cursor.connection.commit()
 
@@ -143,13 +142,6 @@ def get_bot_info(access_token):
     with ApiClient(Configuration(access_token=access_token)) as api_client:
         line_bot_api = MessagingApi(api_client)
         return line_bot_api.get_bot_info().dict()
-    
-def get_all_bot_info():
-    global bot_user_ids
-    for name in BOT_NAMES:
-        data = get_bot_info(CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(name)])
-        bot_user_ids[data["user_id"]] = name
-    print("All bot info:", bot_user_ids)
 
 def compress_image(data, target_size):
     # save and compress image from base64
@@ -191,7 +183,7 @@ def run_schedule():
 @app.route("/<bot_name>/callback", methods=['POST'])
 def callback(bot_name):
     global handler
-    global configuration
+    global message_destinations
 
     try:
         if bot_name not in BOT_NAMES:
@@ -204,8 +196,11 @@ def callback(bot_name):
 
         # handle webhook body
         handler.parser = WebhookParser(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
-        configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
         handler.handle(body, signature)
+
+        # store incoming messages by webhookEventId
+        for event in body["events"]:
+            message_destinations[event["webhookEventId"]] = bot_name
 
         return json.dumps({"status" : "OK."}), 200
     except InvalidSignatureError:
@@ -342,8 +337,9 @@ def get_bot(bot_name):
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    global configuration
-    with ApiClient(configuration) as api_client:
+    bot_name = message_destinations[event.webhook_event_id]
+    del message_destinations[event.webhook_event_id]
+    with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
@@ -354,8 +350,9 @@ def handle_message(event):
 
 @handler.add(MessageEvent, message=ImageMessageContent)
 def handle_image(event):
-    global configuration
-    with ApiClient(configuration) as api_client:
+    bot_name = message_destinations[event.webhook_event_id]
+    del message_destinations[event.webhook_event_id]
+    with ApiClient(Configuration(access_token=CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
@@ -367,12 +364,13 @@ def handle_image(event):
 @handler.add(FollowEvent)
 def handle_follow(event):
     try:
-        print(event)
+        bot_name = message_destinations[event.webhook_event_id]
+        del message_destinations[event.webhook_event_id]
+
         userId = event.source.user_id
-        botId = event.destination
-        user_info = get_user_info(userId, CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_user_ids[botId])])
+        user_info = get_user_info(userId, CHANNEL_ACCESS_TOKEN[BOT_NAMES.index(bot_name)])
         user_info['userId'] = userId
-        user_info['destination'] = botId
+        user_info['bot'] = bot_name
 
         insert_record(userId, user_info)
         print("Follow event received:", user_info)
@@ -392,9 +390,6 @@ if __name__ == "__main__":
     schedule.every().day.at("00:00").do(delete_images)
     schedule_thread = threading.Thread(target=run_schedule)
     schedule_thread.start()
-
-    # get all bot info
-    get_all_bot_info()
 
     # run app
     use_openai = opts.chat
