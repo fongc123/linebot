@@ -199,6 +199,7 @@ def callback(bot_name):
         handler.handle(body, signature)
 
         # store incoming messages by webhookEventId
+        print(body["events"])
         for event in body["events"]:
             message_destinations[event["webhookEventId"]] = bot_name
 
