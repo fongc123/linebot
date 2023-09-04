@@ -196,9 +196,8 @@ def callback(bot_name):
         # store incoming messages by webhookEventId
         events = json.loads(body)["events"]
         for event in events:
-            message_destinations[event["webhookEventId"]] = bot_name
-
-        print(message_destinations)
+            if event["type"] == "message" or event["type"] == "follow":
+                message_destinations[event["webhookEventId"]] = bot_name
 
         # handle webhook body
         handler.parser = WebhookParser(CHANNEL_SECRET[BOT_NAMES.index(bot_name)])
@@ -376,7 +375,6 @@ def handle_follow(event):
 
         insert_record(userId, user_info)
         print("Follow event received:", user_info)
-        print(message_destinations)
     except Exception as e:
         print("Error:", str(e))
 
