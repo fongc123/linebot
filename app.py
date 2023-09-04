@@ -195,9 +195,8 @@ def callback(bot_name):
         app.logger.info("Request body: " + body)
 
         # store incoming messages by webhookEventId
-        print(type(body))
-        print(body["events"])
-        for event in body["events"]:
+        events = json.loads(body)["events"]
+        for event in events:
             message_destinations[event["webhookEventId"]] = bot_name
 
         # handle webhook body
